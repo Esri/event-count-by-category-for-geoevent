@@ -44,7 +44,8 @@ public class EventCountByCategoryDefinition extends GeoEventProcessorDefinitionB
 			ged.setName("EventCountByCategory");
 			List<FieldDefinition> fds = new ArrayList<FieldDefinition>();
 			fds.add(new DefaultFieldDefinition("trackId", FieldType.String, "TRACK_ID"));
-			fds.add(new DefaultFieldDefinition("eventCount", FieldType.Long));
+			fds.add(new DefaultFieldDefinition("currentCount", FieldType.Long));
+      fds.add(new DefaultFieldDefinition("cumulativeCount", FieldType.Long));
 			fds.add(new DefaultFieldDefinition("lastReceived", FieldType.Date));
 			fds.add(new DefaultFieldDefinition("geometry", FieldType.Geometry));
 			ged.setFieldDefinitions(fds);

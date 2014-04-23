@@ -44,7 +44,7 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
   private final Map<String, Thread>            eventCountMonitorThreads = new ConcurrentHashMap<String, Thread>();
 
   private final Map<String, String>            trackCache               = new ConcurrentHashMap<String, String>();
-  private final Map<String, Long>              categoryCountCache       = new ConcurrentHashMap<String, Long>();
+  private final Map<String, Counters>          counterCache             = new ConcurrentHashMap<String, Counters>();
 
   private Messaging                            messaging;
   private GeoEventCreator                      geoEventCreator;
@@ -55,6 +55,7 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
   private boolean                              clearCache;
   private Timer                                clearCacheTimer;
   private String                               categoryField;
+  final   Object                               lock1 = new Object();
 
   class ClearCacheTask extends TimerTask
   {
@@ -64,7 +65,8 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
       {
         for (EventCountMonitor monitor : eventCountMonitors.values())
         {
-          monitor.setEventCount(0);
+          monitor.setCurrentCounter(0L);
+          monitor.setCumulativeCounter(0L);
         }
       }
       // clear the cache
@@ -117,17 +119,29 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
     String previousCategory = trackCache.get(trackId);
     String category = (String) geoEvent.getField(new FieldExpression(categoryField)).getValue();
 
-    // Add or update the status cache
-    trackCache.put(trackId, category);
-    if (!categoryCountCache.containsKey(category))
-      categoryCountCache.put(category, 0l);
-    
-    categoryCountCache.put(category, categoryCountCache.get(category) + 1);
-    if (previousCategory != null && !category.equals(previousCategory))
+    // Need to synchronize the Concurrent Map on write to avoid wrong counting
+    synchronized(lock1)
     {
-      categoryCountCache.put(previousCategory, categoryCountCache.get(previousCategory) - 1);
-    }
-    
+      // Add or update the status cache
+      trackCache.put(trackId, category);
+      if (!counterCache.containsKey(category))
+      {
+        counterCache.put(category, new Counters());
+      }
+  
+      Counters counters = counterCache.get(category);
+      counters.currentCounter++;
+      counters.cumulativeCounter++;
+      counterCache.put(category, counters);
+  
+      //Adjust the previous counters
+      if (previousCategory != null && !category.equals(previousCategory))
+      {
+        Counters previousCounters = counterCache.get(previousCategory);
+        previousCounters.currentCounter--;
+        counterCache.put(previousCategory,  previousCounters);
+      }
+    }    
     doCountMonitoringAndReporting(geoEvent, previousCategory);
     return null;
   }
@@ -194,7 +208,7 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
         clearCacheTimer.scheduleAtFixedRate(new ClearCacheTask(), time1, dayInMilliSeconds);
       }
       trackCache.clear();
-      categoryCountCache.clear();
+      counterCache.clear();
     }
 
     for (EventCountMonitor monitor : eventCountMonitors.values())
@@ -244,42 +258,44 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
       geoEventProducer.send(geoEvent);
   }
 
-  private void doCountMonitoringAndReporting(GeoEvent geoEvent, String previousStatus)
+  private void doCountMonitoringAndReporting(GeoEvent geoEvent, String previousCategory)
   {
     if (trackCache.containsKey(geoEvent.getTrackId()))
     {
-      String newStatus = (String) geoEvent.getField(new FieldExpression(categoryField)).getValue();
+      String category = (String) geoEvent.getField(new FieldExpression(categoryField)).getValue();
       EventCountMonitor monitor = null;
-      if (eventCountMonitors.containsKey(newStatus))
+      if (eventCountMonitors.containsKey(category))
       {
-        monitor = eventCountMonitors.get(newStatus);
+        monitor = eventCountMonitors.get(category);
       }
       else
       {
         monitor = new EventCountMonitor(geoEvent, notificationMode, reportInterval, autoResetCounter, resetTime, categoryField);
         monitor.addObserver(this);
-        eventCountMonitors.put(newStatus, monitor);
-        eventCountMonitorThreads.put(newStatus, new Thread(monitor, newStatus));
+        eventCountMonitors.put(category, monitor);
+        eventCountMonitorThreads.put(category, new Thread(monitor, category));
       }
       if (monitor != null && !monitor.isMonitoring())
       {
-        eventCountMonitorThreads.get(newStatus).start();
+        eventCountMonitorThreads.get(category).start();
       }
 
-      if (!categoryCountCache.isEmpty())
+      if (!counterCache.isEmpty())
       {
-        monitor.setEventCount(categoryCountCache.get(newStatus));
+        monitor.setCurrentCounter(counterCache.get(category).currentCounter);
+        monitor.setCumulativeCounter(counterCache.get(category).cumulativeCounter);
       }
 
       EventCountMonitor prevMonitor = null;
-      if (previousStatus != null)
+      if (previousCategory != null)
       {
-        if (eventCountMonitors.containsKey(previousStatus))
+        if (eventCountMonitors.containsKey(previousCategory))
         {
-          prevMonitor = eventCountMonitors.get(previousStatus);
-          if (!categoryCountCache.isEmpty())
+          prevMonitor = eventCountMonitors.get(previousCategory);
+          if (!counterCache.isEmpty())
           {
-            prevMonitor.setEventCount(categoryCountCache.get(previousStatus));
+            prevMonitor.setCurrentCounter(counterCache.get(previousCategory).currentCounter);
+            prevMonitor.setCumulativeCounter(counterCache.get(previousCategory).cumulativeCounter);
           }
         }
       }
@@ -305,9 +321,10 @@ public class EventCountByCategory extends GeoEventProcessorBase implements Obser
         String category = event.getCategory();
         counterEvent = geoEventCreator.create("EventCountByCategory", definition.getUri().toString());
         counterEvent.setField(0, category);
-        counterEvent.setField(1, event.getEventCount());
-        counterEvent.setField(2, new Date());
-        counterEvent.setField(3, event.getGeometry());
+        counterEvent.setField(1, event.getCurrentCounter());
+        counterEvent.setField(2, event.getCumulativeCounter());
+        counterEvent.setField(3, new Date());
+        counterEvent.setField(4, event.getGeometry());
         counterEvent.setProperty(GeoEventPropertyName.TYPE, "event");
         counterEvent.setProperty(GeoEventPropertyName.OWNER_ID, getId());
         counterEvent.setProperty(GeoEventPropertyName.OWNER_URI, definition.getUri());
@@ -335,7 +352,8 @@ final class EventCountMonitor extends Observable implements Runnable
   private GeoEvent                             geoEvent;
   private EventCountByCategoryNotificationMode notificationMode;
   private long                                 reportInterval;
-  private long                                 eventCount;
+  private Long                                 currentCounter = 0L;
+  private Long                                 cumulativeCounter = 0L;
   private boolean                              autoResetCounter;
   private Date                                 resetTime;
   private String                               categoryField;
@@ -344,7 +362,6 @@ final class EventCountMonitor extends Observable implements Runnable
   protected EventCountMonitor(GeoEvent geoEvent, EventCountByCategoryNotificationMode notificationMode, long reportInterval, boolean autoResetCounter, Date resetTime, String categoryField)
   {
     this.geoEvent = geoEvent;
-    this.eventCount = 0;
     this.monitoring = false;
     this.categoryField = categoryField;
     this.running = true;
@@ -374,24 +391,6 @@ final class EventCountMonitor extends Observable implements Runnable
     this.reportInterval = (timeInterval > 0) ? timeInterval : 120000;
   }
 
-  public long getEventCount()
-  {
-    return eventCount;
-  }
-
-  public void setEventCount(long eventCount)
-  {
-    if (this.eventCount != eventCount)
-    {
-      this.changeDetected = true;
-      this.eventCount = eventCount;
-    }
-    else
-    {
-      this.changeDetected = false;
-    }
-  }
-
   @Override
   public void run()
   {
@@ -409,14 +408,14 @@ final class EventCountMonitor extends Observable implements Runnable
               if (this.changeDetected == true)
               {
                 //Thread.sleep(1); //Sleep 1 millisecond to prevent tight loop
-                notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, this.eventCount, false));
-                consoleDebugPrintLn(category + ":" + this.eventCount);
+                notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, this.currentCounter, this.cumulativeCounter, false));
+                consoleDebugPrintLn(category + ":" + this.currentCounter + ", " + this.cumulativeCounter);
               }
               break;
             case Continuous:
               Thread.sleep(reportInterval);
-              notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, this.eventCount, false));
-              consoleDebugPrintLn(category + ":" + this.eventCount);
+              notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, this.currentCounter, this.cumulativeCounter, false));
+              consoleDebugPrintLn(category + ":" + this.currentCounter + ", " + this.cumulativeCounter);
               break;
           }
           // reset the changeDeteced flag
@@ -424,7 +423,8 @@ final class EventCountMonitor extends Observable implements Runnable
         }
         else
         {
-          notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, 0, true));
+          Counters counters = new Counters();
+          notifyObservers(new EventCountByCategoryEvent(this.geoEvent.getGeometry(), category, currentCounter, cumulativeCounter, true));
         }
       }
       catch (InterruptedException e)
@@ -500,6 +500,42 @@ final class EventCountMonitor extends Observable implements Runnable
     if (consoleOut != null && "1".equals(consoleOut))
     {
       System.out.print(msg);
+    }
+  }
+
+  public Long getCurrentCounter()
+  {
+    return currentCounter;
+  }
+
+  public void setCurrentCounter(Long currentCounter)
+  {
+    if (this.currentCounter != currentCounter)
+    {
+      this.changeDetected = true;
+      this.currentCounter = currentCounter;
+    }
+    else
+    {
+      this.changeDetected = false;
+    }
+  }
+
+  public Long getCumulativeCounter()
+  {
+    return cumulativeCounter;
+  }
+
+  public void setCumulativeCounter(Long cumulativeCounter)
+  {
+    if (this.cumulativeCounter != cumulativeCounter)
+    {
+      this.changeDetected = true;
+      this.cumulativeCounter = cumulativeCounter;
+    }
+    else
+    {
+      this.changeDetected = false;
     }
   }
 }

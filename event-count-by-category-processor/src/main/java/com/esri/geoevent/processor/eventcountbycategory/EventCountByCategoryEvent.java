@@ -6,14 +6,16 @@ public class EventCountByCategoryEvent
 {
   private Geometry geometry;
 	private String category;
-	private long eventCount;
+	private Long currentCounter;
+  private Long cumulativeCounter;
 	private boolean stopMonitoring;
 
-	public EventCountByCategoryEvent(Geometry geometry, String category, long eventCount, boolean stopMonitoring)
+	public EventCountByCategoryEvent(Geometry geometry, String category, Long currentCounter, Long cumulativeCounter, boolean stopMonitoring)
 	{
 	  this.geometry = geometry;
 		this.category = category;
-		this.eventCount = eventCount;
+		this.setCurrentCounter(currentCounter);
+		this.setCumulativeCounter(cumulativeCounter);
 		this.stopMonitoring = stopMonitoring;
 	}
 
@@ -25,11 +27,6 @@ public class EventCountByCategoryEvent
 	public String getCategory()
 	{
 		return category;
-	}
-
-	public long getEventCount()
-	{
-		return eventCount;
 	}
 
 	public boolean isStopMonitoring()
@@ -44,8 +41,30 @@ public class EventCountByCategoryEvent
 		sb.append("EventCountByCategoryEvent(");
 		sb.append(category);
 		sb.append(", ");
-		sb.append(eventCount);
+		sb.append(getCurrentCounter());
+    sb.append(", ");
+    sb.append(getCumulativeCounter());
 		sb.append(")");
 		return sb.toString();
 	}
+
+  public Long getCurrentCounter()
+  {
+    return currentCounter;
+  }
+
+  public void setCurrentCounter(Long currentCounter)
+  {
+    this.currentCounter = currentCounter;
+  }
+
+  public Long getCumulativeCounter()
+  {
+    return cumulativeCounter;
+  }
+
+  public void setCumulativeCounter(Long cumulativeCounter)
+  {
+    this.cumulativeCounter = cumulativeCounter;
+  }
 }
