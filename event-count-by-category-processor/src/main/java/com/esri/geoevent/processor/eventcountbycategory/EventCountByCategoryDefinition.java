@@ -30,7 +30,7 @@ public class EventCountByCategoryDefinition extends GeoEventProcessorDefinitionB
 					"Report Interval (seconds)", "Report Interval (seconds)", "notificationMode=Continuous", false, false));
 			propertyDefinitions.put("geometryField", new PropertyDefinition("geometryField", PropertyType.String, "GEOMETRY",
 					"Geometry Field Name", "Geometry Field Name", false, false));
-      propertyDefinitions.put("categoryField", new PropertyDefinition("categoryField", PropertyType.String, "Category",
+      propertyDefinitions.put("categoryField", new PropertyDefinition("categoryField", PropertyType.String, "TRACK_ID",
           "Category Field Name", "Category Field Name", false, false));
 			propertyDefinitions.put("autoResetCounter", new PropertyDefinition("autoResetCounter", PropertyType.Boolean, false, 
 					"Automatic Reset Counter", "Auto Reset Counter", true, false));
