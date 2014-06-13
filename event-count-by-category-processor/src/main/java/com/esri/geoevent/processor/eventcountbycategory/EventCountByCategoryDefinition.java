@@ -47,7 +47,7 @@ public class EventCountByCategoryDefinition extends GeoEventProcessorDefinitionB
 			fds.add(new DefaultFieldDefinition("currentCount", FieldType.Long));
       fds.add(new DefaultFieldDefinition("cumulativeCount", FieldType.Long));
 			fds.add(new DefaultFieldDefinition("lastReceived", FieldType.Date));
-			fds.add(new DefaultFieldDefinition("geometry", FieldType.Geometry));
+			fds.add(new DefaultFieldDefinition("geometry", FieldType.Geometry, "GEOMETRY"));
 			ged.setFieldDefinitions(fds);
 			geoEventDefinitions.put(ged.getName(), ged);
 		} catch (Exception e)
