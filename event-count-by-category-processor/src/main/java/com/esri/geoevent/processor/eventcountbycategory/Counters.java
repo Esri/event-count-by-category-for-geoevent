@@ -2,9 +2,6 @@ package com.esri.geoevent.processor.eventcountbycategory;
 
 class Counters
 {
-  /**
-   * 
-   */
   Long cumulativeCounter = 0L;
   Long currentCounter = 0L;
   
