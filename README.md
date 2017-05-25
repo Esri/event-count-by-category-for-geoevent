@@ -1,6 +1,6 @@
 # event-count-by-category-for-geoevent
 
-ArcGIS 10.3.x GeoEvent Extension sample Event Count by Category Processor for counting GeoEvents by Category.
+ArcGIS GeoEvent Server sample Event Count by Category Processor for counting GeoEvents by Category.
 
 ![App](event-count-by-category-for-geoevent.png?raw=true)
 
