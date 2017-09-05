@@ -1,3 +1,27 @@
+/*
+  Copyright 2017 Esri
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.​
+
+  For additional information, contact:
+  Environmental Systems Research Institute, Inc.
+  Attn: Contracts Dept
+  380 New York Street
+  Redlands, California, USA 92373
+
+  email: contracts@esri.com
+*/
+
 package com.esri.geoevent.processor.eventcountbycategory;
 
 import java.util.ArrayList;
@@ -34,8 +58,9 @@ public class EventCountByCategoryDefinition extends GeoEventProcessorDefinitionB
 			propertyDefinitions.put("autoResetCounter", new PropertyDefinition("autoResetCounter", PropertyType.Boolean, false, "Automatic Reset Counter", "Auto Reset Counter", true, false));
 			propertyDefinitions.put("resetTime", new PropertyDefinition("resetTime", PropertyType.String, "00:00:00", "Reset Counter to Zero at", "Reset Counter time", "autoResetCounter=true", false, false));
 			propertyDefinitions.put("clearCache", new PropertyDefinition("clearCache", PropertyType.Boolean, true, "Clear in-memory Cache", "Clear in-memory Cache", "autoResetCounter=true", false, false));
-			// TODO: How about TrackId selection to potentially track only a
-			// subset of geoevents ???
+
+			// TODO: How about TrackId selection to potentially track only a subset of geoevents ???
+
 			GeoEventDefinition ged = new DefaultGeoEventDefinition();
 			ged.setName("EventCountByCategory");
 			List<FieldDefinition> fds = new ArrayList<FieldDefinition>();
