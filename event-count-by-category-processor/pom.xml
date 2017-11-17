@@ -10,8 +10,6 @@
 	<artifactId>event-count-by-category-processor</artifactId>
 	<name>Esri :: GeoEvent :: Processor :: EventCountByCategory</name>
 	<packaging>bundle</packaging>
-	<dependencies>
-	</dependencies>
 	<build>
 		<plugins>
 			<plugin>
